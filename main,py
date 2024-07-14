@@ -1,0 +1,60 @@
+import select
+import sys
+from machine import Pin, I2C, ADC
+from ssd1306 import SSD1306_I2C
+import utime
+from machine import ADC
+
+WIDTH = 128
+HEIGHT = 32
+
+# Internal temperature sensor is connected to ADC channel 4
+temp_sensor = ADC(4)
+
+
+def read_internal_temperature():
+    # Read the raw ADC value
+    adc_value = temp_sensor.read_u16()
+
+    # Convert ADC value to voltage
+    voltage = adc_value * (3.3 / 65535.0)
+
+    # Temperature calculation based on sensor characteristics
+    temperature_celsius = 27 - (voltage - 0.706) / 0.001721
+
+    return round(temperature_celsius,1)
+
+# Initialize I2C
+sda = Pin(4)
+scl = Pin(5)
+i2c = I2C(0, sda=sda, scl=scl, freq=200000)
+
+oled = SSD1306_I2C(WIDTH, HEIGHT, i2c)
+
+# Clear the OLED display
+oled.fill(0)
+oled.show()
+
+# Setup poll to read USB port
+poll_object = select.poll()
+poll_object.register(sys.stdin, select.POLLIN)
+
+while True:
+    # Check USB input
+    temperatureC = read_internal_temperature()
+    
+    if poll_object.poll(0):
+
+        # Read as a full line
+        input_string = sys.stdin.readline().strip()
+        if input_string:
+            oled.fill(0)
+            oled.text(str('Case:')+str(temperatureC)+" C", 0, 0)  # (text, x, y) - x and y are the coordinates on the screen
+            cpu,gpu = input_string.split("_")
+            
+            oled.text(cpu, 0, 10)
+            oled.text(gpu, 0, 20)
+
+            
+            # (text, x, y) - x and y are the coordinates on the screen
+            oled.show()
